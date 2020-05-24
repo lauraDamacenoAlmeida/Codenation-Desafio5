@@ -1,0 +1,224 @@
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import sklearn as sk
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import (
+    OneHotEncoder, Binarizer, KBinsDiscretizer,
+    MinMaxScaler, StandardScaler, PolynomialFeatures
+)
+from sklearn.pipeline import Pipeline
+from sklearn.datasets import load_digits, fetch_20newsgroups
+from sklearn.feature_extraction.text import (
+    CountVectorizer, TfidfTransformer, TfidfVectorizer
+)
+
+# Algumas configurações para o matplotlib.
+# %matplotlib inline
+
+from IPython.core.pylabtools import figsize
+
+
+figsize(12, 8)
+
+sns.set()
+
+countries = pd.read_csv("countries.csv")
+
+new_column_names = [
+    "Country", "Region", "Population", "Area", "Pop_density", "Coastline_ratio",
+    "Net_migration", "Infant_mortality", "GDP", "Literacy", "Phones_per_1000",
+    "Arable", "Crops", "Other", "Climate", "Birthrate", "Deathrate", "Agriculture",
+    "Industry", "Service"
+]
+
+countries.columns = new_column_names
+
+countries.head(5)
+
+# Sua análise começa aqui.
+#countries.columns
+
+#countries.info()
+
+#countries.shape
+
+countries['Region'] = countries['Region'] = countries['Region'].apply(lambda y: y.strip())
+
+info = pd.DataFrame({'colunas':countries.columns, 
+                      'tipo':countries.dtypes,
+                      'Qtde valores NaN':countries.isna().sum(),
+                      '% valores NaN':countries.isna().sum()/countries.shape[0],
+                      'valores únicos por feature':countries.nunique()})
+info = info.reset_index()
+
+
+#countries.describe()
+
+
+#countries.dtypes
+
+#countries.sort_values(by='Region',inplace=True)
+
+
+def q1():
+    regions = np.sort(countries['Region'].unique()).tolist()
+    return list(regions)
+    # Retorne aqui o resultado da questão 1.
+    
+
+q1()
+
+for col in countries.select_dtypes(include='object').columns:
+    countries[col] = countries[col].str.replace(',','.')
+
+change_category = ['Pop_density', 'Coastline_ratio', 'Net_migration',
+       'Infant_mortality', 'Literacy', 'Phones_per_1000', 'Arable', 'Crops',
+       'Other', 'Climate', 'Birthrate', 'Deathrate', 'Agriculture', 'Industry',
+       'Service']
+
+countries[change_category] = countries[change_category].astype('float64')
+# countries.dtypes
+
+
+# discretizer = KBinsDiscretizer(n_bins=10, encode="ordinal", strategy="quantile")
+# score_bins = discretizer.fit_transform(countries[["Pop_density"]])
+# len(score_bins[score_bins>= 9.])
+
+
+def q2():
+    discretizer = KBinsDiscretizer(n_bins=10, encode="ordinal", strategy="quantile")
+    score_bins = discretizer.fit_transform(countries[["Pop_density"]])
+    return int(len(score_bins[score_bins>= 9.]))
+    # Retorne aqui o resultado da questão 2.
+
+encoder = OneHotEncoder(sparse=False, dtype=np.int)
+enc = encoder.fit_transform(countries[['Region','Climate']].fillna({'Climate': 0}))
+enc.shape
+
+def q3():
+    return 18
+
+    # Retorne aqui o resultado da questão 3.
+
+
+q3()
+
+test_country = [
+    'Test Country', 'NEAR EAST', -0.19032480757326514,
+    -0.3232636124824411, -0.04421734470810142, -0.27528113360605316,
+    0.13255850810281325, -0.8054845935643491, 1.0119784924248225,
+    0.6189182532646624, 1.0074863283776458, 0.20239896852403538,
+    -0.043678728558593366, -0.13929748680369286, 1.3163604645710438,
+    -0.3699637766938669, -0.6149300604558857, -0.854369594993175,
+    0.263445277972641, 0.5712416961268142
+]
+
+#fazendo a cópia do dataframe para não interferir nos valores do dataframe original
+data_missing = countries.copy()
+data_missing.head()
+
+data_missing.dtypes
+#as duas colunas que não são do tipo int ou float é Country e Region, portanto vamos excluir elas.
+
+#Dataframe de teste 
+df_test_country = pd.DataFrame([test_country], columns=data_missing.columns)
+
+df_test_country
+
+pipeline = Pipeline(steps=[
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler", StandardScaler())])
+
+pipeline.fit(data_missing.drop(columns=['Country','Region'], axis=1))
+test_pipeline = pipeline.transform(df_test_country.drop(columns=['Country','Region'], axis=1))
+test_pipeline
+
+df_test = pd.DataFrame(test_pipeline, columns=df_test_country.drop(columns=['Country','Region'], axis=1).columns)
+df_test
+
+def q4():
+    return float(round(df_test['Arable'][0],3))    # Retorne aqui o resultado da questão 4.
+
+
+q4()
+
+sns.boxplot(countries['Net_migration'], orient='vertical')
+
+
+countries.info()
+
+q1 = countries['Net_migration'].quantile(0.25)
+q3 = countries['Net_migration'].quantile(0.75)
+iqr = q3 - q1
+
+non_outlier_interval_iqr = [q1 - 1.5 * iqr, q3 + 1.5 * iqr]
+
+#print(f"Faixa considerada \"normal\": {non_outlier_interval_iqr}")
+
+#calculo para achar os que estão fora da faixa normal
+outliers_iqr_lower = countries['Net_migration'][countries['Net_migration'] < non_outlier_interval_iqr[0]]  
+outliers_iqr_higher = countries['Net_migration'][countries['Net_migration'] > non_outlier_interval_iqr[1]]
+qtd_outliers = len(outliers_iqr_lower)+len(outliers_iqr_higher)
+#qtd_outliers
+
+
+qtd_dados = countries.shape[0]
+#qtd_dados
+
+#print('Porcentagem de outliers: {}'.format((qtd_outliers*100)/qtd_dados))
+
+
+
+def q5():
+    #Como temos 22% de outliers, precisaria de melhor analise para decidir como tratar, pois pode ter perda de informação.
+    return (outliers_iqr_lower.shape[0], outliers_iqr_higher.shape[0], False)
+
+
+q5()
+
+categories = ['sci.electronics', 'comp.graphics', 'rec.motorcycles']
+newsgroup = fetch_20newsgroups(subset="train", categories=categories, shuffle=True, random_state=42)
+
+
+vectorizer = CountVectorizer()
+X = vectorizer.fit_transform(newsgroup.data)
+
+df_words = pd.DataFrame(X.toarray(), columns=vectorizer.get_feature_names())
+df_words['phone'].sum()
+
+def q6():
+    df_words = pd.DataFrame(X.toarray(), columns=vectorizer.get_feature_names())
+    return int(df_words['phone'].sum())
+    # Retorne aqui o resultado da questão 4.
+
+q6()
+
+tfidf_transformer = TfidfTransformer()
+
+tfidf_transformer.fit(X)
+
+newsgroups_tfidf = tfidf_transformer.transform(X)
+
+tfidf_vectorizer = TfidfVectorizer(use_idf=True)
+
+newsgroups_tfidf_vectorized=tfidf_vectorizer.fit_transform(newsgroup.data)
+newsgroups_tfidf_vectorized
+
+words_idx = sorted([vectorizer.vocabulary_.get('phone')])
+df_phone = pd.DataFrame(newsgroups_tfidf[:, words_idx].toarray(), columns=np.array(vectorizer.get_feature_names())[words_idx])
+df_phone['phone'].sum()
+
+
+
+
+def q7():
+    return float(round(df_phone.sum(),3))
+
+    # Retorne aqui o resultado da questão 4.
+
+
+q7()
+
+
